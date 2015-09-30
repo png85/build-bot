@@ -41,5 +41,16 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    switch (bot.run()) {
+    case dsn::build_bot::Bot::ExitCode::Success:
+        return EXIT_SUCCESS;
+    case dsn::build_bot::Bot::ExitCode::Failure:
+        return EXIT_FAILURE;
+    case dsn::build_bot::Bot::ExitCode::Restart:
+        BOOST_LOG_TRIVIAL(fatal) << "Restart isn't implemented yet!";
+        return EXIT_FAILURE;
+    }
+
+    BOOST_LOG_TRIVIAL(warning) << "Invalid exit code from Bot::run()!";
     return EXIT_SUCCESS;
 }
