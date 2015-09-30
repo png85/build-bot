@@ -1,5 +1,8 @@
 #include <build-bot/bot.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -41,10 +44,37 @@ namespace build_bot {
                 return true;
             }
 
+            bool initFifo()
+            {
+                std::string fifoName;
+                try {
+                    fifoName = m_settings.get<std::string>("fifo.name");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to get FIFO settings from configuration: " << ex.what();
+                    return false;
+                }
+
+                fs::path path(fifoName);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::warning) << "FIFO " << fifoName << " doesn't exist; trying to create it!";
+                    if (mkfifo(fifoName.c_str(), 0666) == -1) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create FIFO " << fifoName << ": " << strerror(errno);
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
         public:
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
+                    return false;
+
+                if (!initFifo())
                     return false;
 
                 return true;
