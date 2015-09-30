@@ -3,6 +3,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <chrono>
+#include <thread>
+
 #include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -109,6 +112,22 @@ namespace build_bot {
 
             dsn::build_bot::Bot::ExitCode run()
             {
+                BOOST_LOG_SEV(log, severity::trace) << "Starting io_service";
+                std::thread ioServiceThread([&]() {
+		    m_io.run();
+                });
+
+                while (!m_stopRequested.load()) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
+                BOOST_LOG_SEV(log, severity::trace) << "Stopping io_service";
+                m_io.stop();
+                ioServiceThread.join();
+
+                if (m_restartAfterStop.load())
+                    return dsn::build_bot::Bot::ExitCode::Restart;
+
                 return dsn::build_bot::Bot::ExitCode::Success;
             }
         };
