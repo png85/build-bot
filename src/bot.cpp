@@ -214,12 +214,15 @@ namespace build_bot {
 
                 return dsn::build_bot::Bot::ExitCode::Success;
             }
+
+            static const std::string DEFAULT_REPO_CONFIG;
         };
     }
 }
 }
 
 const std::string dsn::build_bot::Bot::DEFAULT_CONFIG_FILE{ "etc/build-bot/bot.conf" };
+const std::string dsn::build_bot::priv::Bot::DEFAULT_REPO_CONFIG{ "etc/build-bot/repos.conf" };
 
 Bot::Bot()
     : m_impl(new priv::Bot())
