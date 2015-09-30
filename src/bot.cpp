@@ -12,6 +12,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/regex.hpp>
 
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
@@ -114,9 +115,45 @@ namespace build_bot {
                     std::getline(stream, message);
                 }
 
-                BOOST_LOG_SEV(log, severity::trace) << "Read line from FIFO: " << message;
+                if (!parse(message))
+                    BOOST_LOG_SEV(log, severity::warning) << "Failed to parse message from FIFO: " << message;
 
                 boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
+            }
+
+            bool parse(const std::string& message)
+            {
+                if (message == "STOP") {
+                    BOOST_LOG_SEV(log, severity::info) << "Got STOP command on FIFO!";
+                    stop();
+                    return true;
+                }
+
+                if (message == "RESTART") {
+                    BOOST_LOG_SEV(log, severity::info) << "Got RESTART command on FIFO!";
+                    stop(true);
+                    return true;
+                }
+
+                try {
+                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+)$");
+                    boost::cmatch match;
+                    if (boost::regex_match(message.c_str(), match, BUILD_regex)) {
+                        std::string repoName(match[1].first, match[1].second);
+                        std::string profileName(match[2].first, match[2].second);
+                        std::string gitRevision(match[3].first, match[3].second);
+
+                        BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
+                        return true;
+                    }
+                }
+
+                catch (boost::regex_error& ex) {
+                    BOOST_LOG_SEV(log, severity::fatal) << "BUILD regex is malformed: " << ex.what();
+                    return false;
+                }
+
+                return false;
             }
 
         public:
