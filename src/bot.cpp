@@ -114,9 +114,27 @@ namespace build_bot {
                     std::getline(stream, message);
                 }
 
-                BOOST_LOG_SEV(log, severity::trace) << "Read line from FIFO: " << message;
+                if (!parse(message))
+                    BOOST_LOG_SEV(log, severity::warning) << "Failed to parse message from FIFO: " << message;
 
                 boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
+            }
+
+            bool parse(const std::string& message)
+            {
+                if (message == "STOP") {
+                    BOOST_LOG_SEV(log, severity::info) << "Got STOP command on FIFO!";
+                    stop();
+                    return true;
+                }
+
+                if (message == "RESTART") {
+                    BOOST_LOG_SEV(log, severity::info) << "Got RESTART command on FIFO!";
+                    stop(true);
+                    return true;
+                }
+
+                return false;
             }
 
         public:
