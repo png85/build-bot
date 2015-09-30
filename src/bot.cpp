@@ -73,8 +73,16 @@ namespace build_bot {
                 }
 
                 BOOST_LOG_SEV(log, severity::debug) << "Opening FIFO " << fifoName << " for reading.";
-                if ((m_fifoFd = open(fifoName.c_str(), O_RDWR)) == -1) {
+                int fd{ -1 };
+                if ((fd = open(fifoName.c_str(), O_RDWR)) == -1) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to open FIFO " << fifoName << " for reading: " << strerror(errno);
+                    return false;
+                }
+
+                boost::system::error_code error = m_fifo.assign(fd, error);
+                if (error) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to assign FIFO fd to stream_descriptor: " << boost::system::system_error(error).what();
+                    close(fd);
                     return false;
                 }
 
@@ -89,7 +97,24 @@ namespace build_bot {
 
             std::string m_configFile;
 
-            int m_fifoFd;
+            boost::asio::posix::stream_descriptor m_fifo;
+            boost::asio::streambuf m_buffer;
+
+            void read(const boost::system::error_code& error)
+            {
+                if (error) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to read from FIFO: " << boost::system::system_error(error).what();
+                    return;
+                }
+
+                std::string message;
+                {
+                    std::istream stream(&m_buffer);
+                    std::getline(stream, message);
+                }
+
+                BOOST_LOG_SEV(log, severity::trace) << "Read line from FIFO: " << message;
+            }
 
         public:
             Bot()
@@ -98,16 +123,14 @@ namespace build_bot {
                 , m_stopRequested(false)
                 , m_restartAfterStop(false)
                 , m_configFile("")
-                , m_fifoFd(-1)
+                , m_fifo(m_io)
             {
             }
 
             ~Bot()
             {
-                if (m_fifoFd != -1) {
-                    BOOST_LOG_SEV(log, severity::debug) << "Closing FIFO.";
-                    close(m_fifoFd);
-                }
+                if (m_fifo.is_open())
+                    m_fifo.close();
             }
 
             bool init(const std::string& config_file)
