@@ -184,6 +184,17 @@ namespace build_bot {
                         std::string gitRevision(match[4].first, match[4].second);
 
                         BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
+                        std::string repoUrl;
+                        std::string repoConfigFile;
+                        try {
+                            repoUrl = m_repositories.get<std::string>(repoName + ".url");
+                            repoConfigFile = m_repositories.get<std::string>(repoName + ".config");
+                        }
+                        catch (boost::property_tree::ptree_error& ex) {
+                            BOOST_LOG_SEV(log, severity::error) << "Unable to get configuration for repository " << repoName << ": " << ex.what();
+                            return true;
+                        }
+
                         return true;
                     }
                 }
