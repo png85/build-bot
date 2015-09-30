@@ -26,6 +26,8 @@ namespace build_bot {
 }
 }
 
+const std::string dsn::build_bot::Bot::DEFAULT_CONFIG_FILE{ "etc/build-bot/bot.conf" };
+
 Bot::Bot()
     : m_impl(new priv::Bot())
 {

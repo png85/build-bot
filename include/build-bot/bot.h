@@ -25,6 +25,8 @@ namespace build_bot {
 
     public:
         bool init(const std::string& config_file);
+
+        static const std::string DEFAULT_CONFIG_FILE;
     };
 }
 }
