@@ -12,6 +12,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
+#include <boost/regex.hpp>
 
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
@@ -132,6 +133,24 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::info) << "Got RESTART command on FIFO!";
                     stop(true);
                     return true;
+                }
+
+                try {
+                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+)$");
+                    boost::cmatch match;
+                    if (boost::regex_match(message.c_str(), match, BUILD_regex)) {
+                        std::string repoName(match[1].first, match[1].second);
+                        std::string profileName(match[2].first, match[2].second);
+                        std::string gitRevision(match[3].first, match[3].second);
+
+                        BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
+                        return true;
+                    }
+                }
+
+                catch (boost::regex_error& ex) {
+                    BOOST_LOG_SEV(log, severity::fatal) << "BUILD regex is malformed: " << ex.what();
+                    return false;
                 }
 
                 return false;
