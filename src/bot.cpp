@@ -6,9 +6,19 @@ namespace dsn {
 namespace build_bot {
     namespace priv {
         class Bot : public dsn::log::Base<Bot> {
+        protected:
+            bool loadConfig(const std::string& config_file)
+            {
+                BOOST_LOG_SEV(log, severity::info) << "Loading configuration from " << config_file;
+                return true;
+            }
+
         public:
             bool init(const std::string& config_file)
             {
+                if (!loadConfig(config_file))
+                    return false;
+
                 return true;
             }
         };
