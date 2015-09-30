@@ -173,12 +173,13 @@ namespace build_bot {
                 }
 
                 try {
-                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+)$");
+                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+) (.+)$");
                     boost::cmatch match;
                     if (boost::regex_match(message.c_str(), match, BUILD_regex)) {
                         std::string repoName(match[1].first, match[1].second);
                         std::string profileName(match[2].first, match[2].second);
-                        std::string gitRevision(match[3].first, match[3].second);
+                        std::string branchName(match[3].first, match[3].second);
+                        std::string gitRevision(match[4].first, match[4].second);
 
                         BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
                         return true;
