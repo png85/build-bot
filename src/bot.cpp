@@ -8,6 +8,7 @@
 #include <thread>
 
 #include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -114,6 +115,8 @@ namespace build_bot {
                 }
 
                 BOOST_LOG_SEV(log, severity::trace) << "Read line from FIFO: " << message;
+
+                boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
             }
 
         public:
@@ -153,6 +156,9 @@ namespace build_bot {
 
             dsn::build_bot::Bot::ExitCode run()
             {
+                BOOST_LOG_SEV(log, severity::trace) << "Installing async read handler for FIFO";
+                boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
+
                 BOOST_LOG_SEV(log, severity::trace) << "Starting io_service";
                 std::thread ioServiceThread([&]() {
 		    m_io.run();
