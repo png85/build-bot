@@ -121,3 +121,13 @@ bool Bot::init(const std::string& config_file)
 {
     return m_impl->init(config_file);
 }
+
+void Bot::stop()
+{
+    return m_impl->stop();
+}
+
+void Bot::restart()
+{
+    return m_impl->stop(true);
+}
