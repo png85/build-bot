@@ -35,5 +35,11 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
+    dsn::build_bot::Bot& bot = dsn::build_bot::Bot::instanceRef();
+    if (!bot.init(configFile)) {
+        BOOST_LOG_TRIVIAL(error) << "Failed to initialize; exiting!";
+        return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
