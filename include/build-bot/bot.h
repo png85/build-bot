@@ -28,6 +28,14 @@ namespace build_bot {
         void stop();
         void restart();
 
+        enum class ExitCode {
+            Success = 0,
+            Failure,
+            Restart
+        };
+
+        ExitCode run();
+
         static const std::string DEFAULT_CONFIG_FILE;
     };
 }

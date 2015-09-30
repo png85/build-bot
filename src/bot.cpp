@@ -42,6 +42,8 @@ namespace build_bot {
                     return false;
                 }
 
+                m_configFile = config_file;
+
                 return true;
             }
 
@@ -75,12 +77,15 @@ namespace build_bot {
             std::atomic<bool> m_stopRequested;
             std::atomic<bool> m_restartAfterStop;
 
+            std::string m_configFile;
+
         public:
             Bot()
                 : m_io()
                 , m_strand(m_io)
                 , m_stopRequested(false)
                 , m_restartAfterStop(false)
+                , m_configFile("")
             {
             }
 
@@ -130,4 +135,9 @@ void Bot::stop()
 void Bot::restart()
 {
     return m_impl->stop(true);
+}
+
+Bot::ExitCode Bot::run()
+{
+    return ExitCode::Success;
 }
