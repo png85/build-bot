@@ -25,3 +25,8 @@ add_subdirectory(dsnutil_cpp)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/dsnutil_cpp/include)
 include_directories(${CMAKE_CURRENT_BINARY_DIR}/dsnutil_cpp/include)
 
+configure_file(version.cpp.in ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+
+file(GLOB buildbot_SRCS src/*.cpp)
+list(APPEND buildbot_SRCS ${CMAKE_CURRENT_BINARY_DIR}/version.cpp)
+add_executable(build_bot ${buildbot_SRCS})
