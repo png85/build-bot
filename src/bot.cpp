@@ -72,10 +72,15 @@ namespace build_bot {
             boost::asio::io_service m_io;
             boost::asio::strand m_strand;
 
+            std::atomic<bool> m_stopRequested;
+            std::atomic<bool> m_restartAfterStop;
+
         public:
             Bot()
                 : m_io()
                 , m_strand(m_io)
+                , m_stopRequested(false)
+                , m_restartAfterStop(false)
             {
             }
 
@@ -88,6 +93,13 @@ namespace build_bot {
                     return false;
 
                 return true;
+            }
+
+            void stop(bool restart = false)
+            {
+                if (restart)
+                    m_restartAfterStop = true;
+                m_stopRequested = true;
             }
         };
     }
