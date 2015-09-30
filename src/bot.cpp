@@ -106,6 +106,11 @@ namespace build_bot {
                     m_restartAfterStop = true;
                 m_stopRequested = true;
             }
+
+            dsn::build_bot::Bot::ExitCode run()
+            {
+                return dsn::build_bot::Bot::ExitCode::Success;
+            }
         };
     }
 }
@@ -139,5 +144,5 @@ void Bot::restart()
 
 Bot::ExitCode Bot::run()
 {
-    return ExitCode::Success;
+    return m_impl->run();
 }
