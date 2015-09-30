@@ -1,4 +1,5 @@
 #include <build-bot/bot.h>
+#include <build-bot/worker.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -13,6 +14,8 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
+
+#include <dsnutil/threadpool.h>
 
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
@@ -173,14 +176,31 @@ namespace build_bot {
                 }
 
                 try {
-                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+)$");
+                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+) (.+)$");
                     boost::cmatch match;
                     if (boost::regex_match(message.c_str(), match, BUILD_regex)) {
                         std::string repoName(match[1].first, match[1].second);
                         std::string profileName(match[2].first, match[2].second);
-                        std::string gitRevision(match[3].first, match[3].second);
+                        std::string branchName(match[3].first, match[3].second);
+                        std::string gitRevision(match[4].first, match[4].second);
 
                         BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
+                        std::string repoUrl;
+                        std::string repoConfigFile;
+                        try {
+                            repoUrl = m_repositories.get<std::string>(repoName + ".url");
+                            repoConfigFile = m_repositories.get<std::string>(repoName + ".config");
+                        }
+                        catch (boost::property_tree::ptree_error& ex) {
+                            BOOST_LOG_SEV(log, severity::error) << "Unable to get configuration for repository " << repoName << ": " << ex.what();
+                            return true;
+                        }
+
+                        m_threadPool.enqueue([&]() {
+			    dsn::build_bot::Worker worker(repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+			    worker.run();
+                        });
+
                         return true;
                     }
                 }
@@ -192,6 +212,8 @@ namespace build_bot {
 
                 return false;
             }
+
+            dsn::ThreadPool m_threadPool;
 
         public:
             Bot()
