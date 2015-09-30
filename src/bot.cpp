@@ -3,6 +3,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <boost/asio.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -68,7 +69,16 @@ namespace build_bot {
                 return true;
             }
 
+            boost::asio::io_service m_io;
+            boost::asio::strand m_strand;
+
         public:
+            Bot()
+                : m_io()
+                , m_strand(m_io)
+            {
+            }
+
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
