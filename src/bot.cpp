@@ -1,6 +1,8 @@
 #include <build-bot/bot.h>
 
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
@@ -10,6 +12,8 @@ namespace build_bot {
     namespace priv {
         class Bot : public dsn::log::Base<Bot> {
         protected:
+            boost::property_tree::ptree m_settings;
+
             bool loadConfig(const std::string& config_file)
             {
                 BOOST_LOG_SEV(log, severity::info) << "Loading configuration from " << config_file;
@@ -22,6 +26,15 @@ namespace build_bot {
 
                 if (!fs::is_regular_file(path)) {
                     BOOST_LOG_SEV(log, severity::error) << "Config file " << config_file << " isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(config_file, m_settings);
+                }
+
+                catch (boost::property_tree::ini_parser_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse config file " << config_file << ": " << ex.what();
                     return false;
                 }
 
