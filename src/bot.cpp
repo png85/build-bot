@@ -2,6 +2,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include <chrono>
 #include <thread>
@@ -71,6 +72,12 @@ namespace build_bot {
                     }
                 }
 
+                BOOST_LOG_SEV(log, severity::debug) << "Opening FIFO " << fifoName << " for reading.";
+                if ((m_fifoFd = open(fifoName.c_str(), O_RDWR)) == -1) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to open FIFO " << fifoName << " for reading: " << strerror(errno);
+                    return false;
+                }
+
                 return true;
             }
 
@@ -82,6 +89,8 @@ namespace build_bot {
 
             std::string m_configFile;
 
+            int m_fifoFd;
+
         public:
             Bot()
                 : m_io()
@@ -89,7 +98,16 @@ namespace build_bot {
                 , m_stopRequested(false)
                 , m_restartAfterStop(false)
                 , m_configFile("")
+                , m_fifoFd(-1)
             {
+            }
+
+            ~Bot()
+            {
+                if (m_fifoFd != -1) {
+                    BOOST_LOG_SEV(log, severity::debug) << "Closing FIFO.";
+                    close(m_fifoFd);
+                }
             }
 
             bool init(const std::string& config_file)
