@@ -37,6 +37,10 @@ Worker::Worker(const std::string& url, const std::string& branch, const std::str
 {
 }
 
+Worker::~Worker()
+{
+}
+
 void Worker::run()
 {
     return m_impl->run();

@@ -1,4 +1,5 @@
 #include <build-bot/bot.h>
+#include <build-bot/worker.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -194,6 +195,11 @@ namespace build_bot {
                             BOOST_LOG_SEV(log, severity::error) << "Unable to get configuration for repository " << repoName << ": " << ex.what();
                             return true;
                         }
+
+                        m_threadPool.enqueue([&]() {
+			    dsn::build_bot::Worker worker(repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+			    worker.run();
+                        });
 
                         return true;
                     }

@@ -13,6 +13,7 @@ namespace build_bot {
     class Worker : public dsn::log::Base<Worker> {
     public:
         Worker(const std::string& url, const std::string& branch, const std::string& revision, const std::string& config_file, const std::string& profile_name);
+        ~Worker();
         void run();
 
     private:
