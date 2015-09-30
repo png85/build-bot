@@ -23,6 +23,7 @@ namespace build_bot {
         class Bot : public dsn::log::Base<Bot> {
         protected:
             boost::property_tree::ptree m_settings;
+            boost::property_tree::ptree m_repositories;
 
             bool loadConfig(const std::string& config_file)
             {
@@ -85,6 +86,42 @@ namespace build_bot {
                 if (error) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to assign FIFO fd to stream_descriptor: " << boost::system::system_error(error).what();
                     close(fd);
+                    return false;
+                }
+
+                return true;
+            }
+
+            bool initRepositories()
+            {
+                std::string repoFile;
+                try {
+                    repoFile = m_settings.get<std::string>("repositories.config", DEFAULT_REPO_CONFIG);
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get repository config file from settings: " << ex.what();
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Initializing repository configuration from " << repoFile;
+                fs::path path(repoFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Repository config file " << repoFile << " doesn't exist!";
+                    return false;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Repository config " << repoFile << " isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(repoFile, m_repositories);
+                }
+
+                catch (boost::property_tree::ini_parser_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse repository configuration from " << repoFile << ": " << ex.what();
                     return false;
                 }
 
@@ -176,6 +213,9 @@ namespace build_bot {
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
+                    return false;
+
+                if (!initRepositories())
                     return false;
 
                 if (!initFifo())
