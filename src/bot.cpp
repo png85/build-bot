@@ -14,6 +14,8 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
 
+#include <dsnutil/threadpool.h>
+
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
 
@@ -193,6 +195,8 @@ namespace build_bot {
 
                 return false;
             }
+
+            dsn::ThreadPool m_threadPool;
 
         public:
             Bot()
