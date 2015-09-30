@@ -1,0 +1,3 @@
+[submodule "dsnutil_cpp"]
+	path = dsnutil_cpp
+	url = git://git.das-system-networks.de/dsnutil_cpp.git
