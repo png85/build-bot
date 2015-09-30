@@ -2,11 +2,13 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #include <chrono>
 #include <thread>
 
 #include <boost/asio.hpp>
+#include <boost/bind.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -71,6 +73,20 @@ namespace build_bot {
                     }
                 }
 
+                BOOST_LOG_SEV(log, severity::debug) << "Opening FIFO " << fifoName << " for reading.";
+                int fd{ -1 };
+                if ((fd = open(fifoName.c_str(), O_RDWR)) == -1) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to open FIFO " << fifoName << " for reading: " << strerror(errno);
+                    return false;
+                }
+
+                boost::system::error_code error = m_fifo.assign(fd, error);
+                if (error) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to assign FIFO fd to stream_descriptor: " << boost::system::system_error(error).what();
+                    close(fd);
+                    return false;
+                }
+
                 return true;
             }
 
@@ -82,6 +98,27 @@ namespace build_bot {
 
             std::string m_configFile;
 
+            boost::asio::posix::stream_descriptor m_fifo;
+            boost::asio::streambuf m_buffer;
+
+            void read(const boost::system::error_code& error)
+            {
+                if (error) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to read from FIFO: " << boost::system::system_error(error).what();
+                    return;
+                }
+
+                std::string message;
+                {
+                    std::istream stream(&m_buffer);
+                    std::getline(stream, message);
+                }
+
+                BOOST_LOG_SEV(log, severity::trace) << "Read line from FIFO: " << message;
+
+                boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
+            }
+
         public:
             Bot()
                 : m_io()
@@ -89,7 +126,14 @@ namespace build_bot {
                 , m_stopRequested(false)
                 , m_restartAfterStop(false)
                 , m_configFile("")
+                , m_fifo(m_io)
             {
+            }
+
+            ~Bot()
+            {
+                if (m_fifo.is_open())
+                    m_fifo.close();
             }
 
             bool init(const std::string& config_file)
@@ -112,6 +156,9 @@ namespace build_bot {
 
             dsn::build_bot::Bot::ExitCode run()
             {
+                BOOST_LOG_SEV(log, severity::trace) << "Installing async read handler for FIFO";
+                boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
+
                 BOOST_LOG_SEV(log, severity::trace) << "Starting io_service";
                 std::thread ioServiceThread([&]() {
 		    m_io.run();
