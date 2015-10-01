@@ -5,7 +5,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules")
 
 set(buildbot_VERSION_MAJOR 0)
 set(buildbot_VERSION_MINOR 99)
-set(buildbot_VERSION_PATCH 1)
+set(buildbot_VERSION_PATCH 2)
 
 find_package(Threads REQUIRED)
 
