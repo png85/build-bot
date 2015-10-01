@@ -1,7 +1,10 @@
 #include <build-bot/worker.h>
 
+#include <boost/filesystem.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
+
+namespace fs = boost::filesystem;
 
 namespace dsn {
 namespace build_bot {
@@ -33,6 +36,31 @@ namespace build_bot {
             static const std::string BUILD_ID_CHARS;
             static const size_t BUILD_ID_LENGTH;
 
+            std::string m_toplevelDirectory;
+
+            bool initToplevelDirectory()
+            {
+                std::stringstream ss;
+                ss << m_buildDir << "/" << m_profileName << "/" << m_repoName << "/" << m_buildId;
+                m_toplevelDirectory = ss.str();
+                fs::path path(m_toplevelDirectory);
+
+                BOOST_LOG_SEV(log, severity::info) << "Toplevel build directory is " << m_toplevelDirectory;
+
+                if (!fs::exists(path)) {
+                    try {
+                        fs::create_directories(path);
+                    }
+
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create toplevel directory " << m_toplevelDirectory << ": " << ex.what();
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
         public:
             Worker(const std::string& build_directory,
                    const std::string& repo_name,
@@ -54,6 +82,10 @@ namespace build_bot {
                 m_buildId = generateBuildId();
                 BOOST_LOG_SEV(log, severity::info) << "Worker started for repo " << m_repoName
                                                    << " (profile: " << m_profileName << ", config: " << m_configFile << ") - Build ID: " << m_buildId;
+                if (!initToplevelDirectory()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to create build directory; build FAILED!";
+                    return;
+                }
             }
         };
 
