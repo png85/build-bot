@@ -15,6 +15,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
 
+#include <dsnutil/log/util.h>
 #include <dsnutil/threadpool.h>
 
 namespace fs = boost::filesystem;
@@ -265,6 +266,22 @@ namespace build_bot {
 
             dsn::ThreadPool m_threadPool;
 
+            bool setupLogging()
+            {
+                std::string logLevel;
+                try {
+                    logLevel = m_settings.get<std::string>("log.level", "debug");
+                }
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to get logging settings from configuration: " << ex.what();
+                    return false;
+                }
+
+                m_logSeverity = dsn::log::util::severityFromString(logLevel);
+                BOOST_LOG_SEV(log, severity::debug) << "Configured log severity is " << m_logSeverity;
+                return true;
+            }
+
         public:
             Bot()
                 : m_io()
@@ -286,6 +303,9 @@ namespace build_bot {
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
+                    return false;
+
+                if (!setupLogging())
                     return false;
 
                 if (!initRepositories())
