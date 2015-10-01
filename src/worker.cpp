@@ -1,9 +1,13 @@
 #include <build-bot/worker.h>
 
+#include <boost/random/random_device.hpp>
+#include <boost/random/uniform_int_distribution.hpp>
+
 namespace dsn {
 namespace build_bot {
     namespace priv {
         class Worker : public dsn::log::Base<Worker> {
+        private:
             std::string m_url;
             std::string m_branch;
             std::string m_revision;
@@ -11,6 +15,23 @@ namespace build_bot {
             std::string m_profileName;
             std::string m_buildDir;
             std::string m_repoName;
+
+            std::string generateBuildId()
+            {
+                std::string res;
+                boost::random::random_device rng;
+                boost::random::uniform_int_distribution<> dist(0, BUILD_ID_CHARS.size() - 1);
+
+                for (size_t i = 0; i < BUILD_ID_LENGTH; i++)
+                    res += BUILD_ID_CHARS[dist(rng)];
+
+                return res;
+            }
+
+            std::string m_buildId;
+
+            static const std::string BUILD_ID_CHARS;
+            static const size_t BUILD_ID_LENGTH;
 
         public:
             Worker(const std::string& build_directory,
@@ -29,10 +50,15 @@ namespace build_bot {
 
             void run()
             {
-                BOOST_LOG_SEV(log, severity::debug) << "Worker started for repo " << m_url << "/" << m_branch << " (" << m_revision << ")"
-                                                    << ", profile=" << m_profileName << "; config=" << m_configFile;
+
+                m_buildId = generateBuildId();
+                BOOST_LOG_SEV(log, severity::info) << "Worker started for repo " << m_repoName
+                                                   << " (profile: " << m_profileName << ", config: " << m_configFile << ") - Build ID: " << m_buildId;
             }
         };
+
+        const std::string Worker::BUILD_ID_CHARS{ "0123456789abcdef" };
+        const size_t Worker::BUILD_ID_LENGTH{ 8 };
     }
 }
 }
