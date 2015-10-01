@@ -228,7 +228,7 @@ namespace build_bot {
                         }
 
                         m_threadPool.enqueue([=]() {
-			    dsn::build_bot::Worker worker(repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+			    dsn::build_bot::Worker worker(m_buildDirectory, repoUrl, branchName, gitRevision, repoConfigFile, profileName);
 			    worker.run();
                         });
 
