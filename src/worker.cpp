@@ -61,6 +61,15 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_sourceDirectory;
+            bool checkoutSources()
+            {
+                m_sourceDirectory = m_toplevelDirectory + "/repo";
+                BOOST_LOG_SEV(log, severity::info) << "Checking out sources from " << m_url << " to " << m_sourceDirectory;
+
+                return true;
+            }
+
         public:
             Worker(const std::string& build_directory,
                    const std::string& repo_name,
@@ -84,6 +93,11 @@ namespace build_bot {
                                                    << " (profile: " << m_profileName << ", config: " << m_configFile << ") - Build ID: " << m_buildId;
                 if (!initToplevelDirectory()) {
                     BOOST_LOG_SEV(log, severity::error) << "Unable to create build directory; build FAILED!";
+                    return;
+                }
+
+                if (!checkoutSources()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to checkout sources from " << m_url << "; build FAILED!";
                     return;
                 }
             }
