@@ -1,5 +1,6 @@
 #include <build-bot/worker.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -213,6 +214,25 @@ namespace build_bot {
                 return true;
             }
 
+            bool replaceMacros(std::string& str)
+            {
+                for (auto& kv : m_macros) {
+                    try {
+                        std::string key = kv.first;
+                        std::string val = m_macros.get<std::string>(key);
+                        std::string token = "@" + key + "@";
+                        boost::algorithm::replace_all(str, token, val);
+                    }
+
+                    catch (boost::property_tree::ptree_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to replace macro: " << ex.what();
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
             bool configureSources()
             {
                 BOOST_LOG_SEV(log, severity::info) << "Trying to configure sources";
@@ -232,6 +252,13 @@ namespace build_bot {
                 }
 
                 BOOST_LOG_SEV(log, severity::debug) << "Configure command is: " << configureCommand;
+
+                if (!replaceMacros(configureCommand)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro expansion failed for configure command!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Configure command after macro expansion is: " << configureCommand;
 
                 return true;
             }
