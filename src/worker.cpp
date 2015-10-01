@@ -4,6 +4,8 @@
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 
+#include <boost/process.hpp>
+
 namespace fs = boost::filesystem;
 
 namespace dsn {
@@ -61,6 +63,26 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_gitExecutable;
+            bool findGitExecutable()
+            {
+                try {
+                    m_gitExecutable = boost::process::search_path("git");
+                }
+                catch (std::runtime_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to locate git executable in PATH: " << ex.what();
+                    return false;
+                }
+
+                if (m_gitExecutable.size() == 0) {
+                    BOOST_LOG_SEV(log, severity::error) << "No git executable found in PATH!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Using git executable from " << m_gitExecutable;
+                return true;
+            }
+
             std::string m_sourceDirectory;
             bool checkoutSources()
             {
@@ -87,6 +109,10 @@ namespace build_bot {
 
             void run()
             {
+                if (!findGitExecutable()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to find git; build FAILED!";
+                    return;
+                }
 
                 m_buildId = generateBuildId();
                 BOOST_LOG_SEV(log, severity::info) << "Worker started for repo " << m_repoName
