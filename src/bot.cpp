@@ -147,8 +147,15 @@ namespace build_bot {
 
                 fs::path path(buildDir);
                 if (!fs::exists(path)) {
-                    BOOST_LOG_SEV(log, severity::error) << "Build directory " << buildDir << "doesn't exist!";
-                    return false;
+                    BOOST_LOG_SEV(log, severity::warning) << "Build directory " << buildDir << "doesn't exist; trying to create it!";
+                    try {
+                        boost::filesystem::create_directories(path);
+                    }
+
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create build directory " << buildDir << ": " << ex.what();
+                        return false;
+                    }
                 }
 
                 if (!fs::is_directory(path)) {
