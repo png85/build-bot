@@ -91,7 +91,7 @@ namespace build_bot {
 
                 try {
                     std::stringstream ssArgs;
-                    ssArgs << m_gitExecutable << " clone -q --recursive -b " << m_branch << " " << m_url << " " << m_sourceDirectory;
+                    ssArgs << m_gitExecutable << " clone --recursive -b " << m_branch << " " << m_url << " " << m_sourceDirectory;
                     std::string args = ssArgs.str();
                     BOOST_LOG_SEV(log, severity::debug) << "Git command line is " << args;
 
@@ -109,6 +109,30 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to run git to check out sources: " << ex.what();
                     return false;
                 }
+
+                BOOST_LOG_SEV(log, severity::info) << "Repository cloned successfully. Checking out revision " << m_revision;
+
+                try {
+                    std::stringstream ssArgs;
+                    ssArgs << m_gitExecutable << " checkout " << m_revision << " .";
+                    std::string args = ssArgs.str();
+                    BOOST_LOG_SEV(log, severity::debug) << "Git command line is " << args;
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(m_gitExecutable),
+                                                                          boost::process::initializers::set_cmd_line(args),
+                                                                          boost::process::initializers::start_in_dir(m_sourceDirectory));
+                    auto exit_code = boost::process::wait_for_exit(child);
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Got non-zero exit status from '" << args << "': " << exit_code;
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to run git to check out revision " << m_revision << ": " << ex.what();
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Checkout out revision " << m_revision;
 
                 return true;
             }
