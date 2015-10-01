@@ -46,4 +46,6 @@ set(CPACK_PACKAGE_VERSION_MINOR ${buildbot_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${buildbot_VERSION_PATCH})
 include(CPack)
 
+install(DIRECTORY etc/build-bot DESTINATION share/examples/)
+
 include(CTest)
