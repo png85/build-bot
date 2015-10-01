@@ -9,6 +9,7 @@
 
 #include <boost/process.hpp>
 
+#include <dsnutil/finally.h>
 #include <dsnutil/pretty_print.h>
 
 namespace fs = boost::filesystem;
@@ -402,6 +403,17 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::error) << "Unable to create build directory; build FAILED!";
                     return;
                 }
+
+                dsn::finally finally_delete_toplevel_dir([&]() {
+		    BOOST_LOG_SEV(log , severity::info) << "Removing build directory: " << m_toplevelDirectory;
+		    try {
+		      fs::path path(m_toplevelDirectory);
+		      fs::remove_all(path);
+		    }
+		    catch(boost::system::system_error& ex) {
+		      BOOST_LOG_SEV(log,severity::error) << "Failed to remove build directory: " << ex.what();
+		    }
+                });
 
                 if (!loadMacroFile()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to load macro file; build FAILED!";
