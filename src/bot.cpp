@@ -131,6 +131,44 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_buildDirectory;
+
+            bool initBuildDirectory()
+            {
+                std::string buildDir;
+                try {
+                    buildDir = m_settings.get<std::string>("fs.build_dir");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get build directory from configuration: " << ex.what();
+                    return false;
+                }
+
+                fs::path path(buildDir);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Build directory " << buildDir << "doesn't exist; trying to create it!";
+                    try {
+                        boost::filesystem::create_directories(path);
+                    }
+
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create build directory " << buildDir << ": " << ex.what();
+                        return false;
+                    }
+                }
+
+                if (!fs::is_directory(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Configured build path " << buildDir << " isn't a directory!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Build directory is " << buildDir;
+                m_buildDirectory = buildDir;
+
+                return true;
+            }
+
             boost::asio::io_service m_io;
             boost::asio::strand m_strand;
 
@@ -196,8 +234,8 @@ namespace build_bot {
                             return true;
                         }
 
-                        m_threadPool.enqueue([&]() {
-			    dsn::build_bot::Worker worker(repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+                        m_threadPool.enqueue([=]() {
+			    dsn::build_bot::Worker worker(m_buildDirectory, repoUrl, branchName, gitRevision, repoConfigFile, profileName);
 			    worker.run();
                         });
 
@@ -238,6 +276,9 @@ namespace build_bot {
                     return false;
 
                 if (!initRepositories())
+                    return false;
+
+                if (!initBuildDirectory())
                     return false;
 
                 if (!initFifo())
