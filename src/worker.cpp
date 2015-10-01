@@ -213,6 +213,22 @@ namespace build_bot {
                 return true;
             }
 
+            bool configureSources()
+            {
+                BOOST_LOG_SEV(log, severity::info) << "Trying to configure sources";
+                std::string configureCommand;
+                try {
+                    configureCommand = m_buildSettings.get<std::string>(m_profileName + ".cmd_configure");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to get configure command from build settings: " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
         public:
             Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
@@ -261,6 +277,11 @@ namespace build_bot {
 
                 if (!loadBuildConfig()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to load build configuration; build FAILED!";
+                    return;
+                }
+
+                if (!configureSources()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Configure step aborted; build FAILED!";
                     return;
                 }
             }
