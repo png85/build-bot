@@ -1,4 +1,5 @@
 #include <iostream>
+#include <unistd.h>
 
 #include <boost/log/trivial.hpp>
 #include <boost/program_options.hpp>
@@ -47,8 +48,10 @@ int main(int argc, char** argv)
     case dsn::build_bot::Bot::ExitCode::Failure:
         return EXIT_FAILURE;
     case dsn::build_bot::Bot::ExitCode::Restart:
-        BOOST_LOG_TRIVIAL(fatal) << "Restart isn't implemented yet!";
-        return EXIT_FAILURE;
+        if (execv(argv[0], argv) == -1) {
+            BOOST_LOG_TRIVIAL(fatal) << "execv() failed: " << strerror(errno);
+            return EXIT_FAILURE;
+        }
     }
 
     BOOST_LOG_TRIVIAL(warning) << "Invalid exit code from Bot::run()!";

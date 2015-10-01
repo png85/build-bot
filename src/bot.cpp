@@ -1,5 +1,6 @@
 #include <build-bot/bot.h>
 #include <build-bot/worker.h>
+#include <build-bot/version.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -306,6 +307,8 @@ namespace build_bot {
 
             dsn::build_bot::Bot::ExitCode run()
             {
+                BOOST_LOG_SEV(log, severity::info) << "build_bot v" << dsn::build_bot::version::MAJOR << "." << dsn::build_bot::version::MINOR
+                                                   << "." << dsn::build_bot::version::PATCH << " (" << dsn::build_bot::version::GIT_SHA1 << ") starting up...";
                 BOOST_LOG_SEV(log, severity::trace) << "Installing async read handler for FIFO";
                 boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
 
