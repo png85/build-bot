@@ -193,6 +193,26 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_binaryDir;
+            bool createBinaryDir()
+            {
+                m_binaryDir = m_toplevelDirectory + "/build";
+                fs::path path(m_binaryDir);
+
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::info) << "Creating binary dir: " << m_binaryDir;
+                    try {
+                        fs::create_directories(path);
+                    }
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create binary dir " << m_binaryDir << ": " << ex.what();
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
         public:
             Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
@@ -231,6 +251,11 @@ namespace build_bot {
 
                 if (!checkoutSources()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to checkout sources from " << m_url << "; build FAILED!";
+                    return;
+                }
+
+                if (!createBinaryDir()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to create build directory; build FAILED!";
                     return;
                 }
 
