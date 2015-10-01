@@ -444,6 +444,8 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::error) << "Build step aborted; build FAILED!";
                     return;
                 }
+
+                BOOST_LOG_SEV(log, severity::info) << "All steps finished; build SUCCESSFUL!";
             }
         };
 
