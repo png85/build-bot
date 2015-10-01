@@ -135,7 +135,7 @@ namespace build_bot {
                     return false;
                 }
 
-                BOOST_LOG_SEV(log, severity::info) << "Checkout out revision " << m_revision;
+                BOOST_LOG_SEV(log, severity::info) << "Checked out revision " << m_revision;
 
                 return true;
             }
