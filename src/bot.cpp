@@ -1,5 +1,6 @@
 #include <build-bot/bot.h>
 #include <build-bot/worker.h>
+#include <build-bot/version.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -15,6 +16,8 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
 
+#include <dsnutil/log/sinkmanager.h>
+#include <dsnutil/log/util.h>
 #include <dsnutil/threadpool.h>
 
 namespace fs = boost::filesystem;
@@ -27,6 +30,8 @@ namespace build_bot {
         protected:
             boost::property_tree::ptree m_settings;
             boost::property_tree::ptree m_repositories;
+
+            severity m_logSeverity;
 
             bool loadConfig(const std::string& config_file)
             {
@@ -263,6 +268,33 @@ namespace build_bot {
 
             dsn::ThreadPool m_threadPool;
 
+            bool setupLogging()
+            {
+                std::string logLevel;
+                try {
+                    logLevel = m_settings.get<std::string>("log.level", "debug");
+                }
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to get logging settings from configuration: " << ex.what();
+                    return false;
+                }
+
+                m_logSeverity = dsn::log::util::severityFromString(logLevel);
+                BOOST_LOG_SEV(log, severity::debug) << "Configured log severity is " << m_logSeverity;
+
+                dsn::log::SinkManager& manager = dsn::log::SinkManager::instanceRef();
+                for (auto& name : manager.sinks()) {
+                    auto sink = reinterpret_cast<boost::log::sinks::basic_sink_frontend*>(manager.sink(name).get());
+                    assert(sink != nullptr);
+                    sink->set_filter([&](const boost::log::attribute_value_set& attrs) -> bool {
+			return attrs["Severity"].extract<severity>() >= m_logSeverity;
+                    });
+                    BOOST_LOG_SEV(log, severity::debug) << "Installed priority filter for sink " << name;
+                }
+
+                return true;
+            }
+
         public:
             Bot()
                 : m_io()
@@ -271,6 +303,7 @@ namespace build_bot {
                 , m_restartAfterStop(false)
                 , m_configFile("")
                 , m_fifo(m_io)
+                , m_logSeverity(severity::debug)
             {
             }
 
@@ -283,6 +316,9 @@ namespace build_bot {
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
+                    return false;
+
+                if (!setupLogging())
                     return false;
 
                 if (!initRepositories())
@@ -306,6 +342,8 @@ namespace build_bot {
 
             dsn::build_bot::Bot::ExitCode run()
             {
+                BOOST_LOG_SEV(log, severity::info) << "build_bot v" << dsn::build_bot::version::MAJOR << "." << dsn::build_bot::version::MINOR
+                                                   << "." << dsn::build_bot::version::PATCH << " (" << dsn::build_bot::version::GIT_SHA1 << ") starting up...";
                 BOOST_LOG_SEV(log, severity::trace) << "Installing async read handler for FIFO";
                 boost::asio::async_read_until(m_fifo, m_buffer, "\n", boost::bind(&Bot::read, this, boost::asio::placeholders::error));
 
