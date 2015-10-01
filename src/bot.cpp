@@ -28,6 +28,8 @@ namespace build_bot {
             boost::property_tree::ptree m_settings;
             boost::property_tree::ptree m_repositories;
 
+            severity m_logSeverity;
+
             bool loadConfig(const std::string& config_file)
             {
                 BOOST_LOG_SEV(log, severity::info) << "Loading configuration from " << config_file;
@@ -271,6 +273,7 @@ namespace build_bot {
                 , m_restartAfterStop(false)
                 , m_configFile("")
                 , m_fifo(m_io)
+                , m_logSeverity(severity::debug)
             {
             }
 
