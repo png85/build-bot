@@ -350,6 +350,25 @@ namespace build_bot {
 
                 BOOST_LOG_SEV(log, severity::trace) << "Full build command is " << buildCommand;
 
+                try {
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(executable),
+                                                                          boost::process::initializers::set_cmd_line(buildCommand),
+                                                                          boost::process::initializers::start_in_dir(m_binaryDir),
+                                                                          boost::process::initializers::inherit_env());
+                    auto exit_code = boost::process::wait_for_exit(child);
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Build command " << buildCommand << " returned non-zero exit status!";
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to execute build command " << buildCommand << ": " << ex.what();
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Build stage completed successfully.";
+
                 return true;
             }
 
