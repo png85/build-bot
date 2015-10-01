@@ -283,6 +283,23 @@ namespace build_bot {
                 boost::algorithm::replace_first(configureCommand, command[0], executable);
                 BOOST_LOG_SEV(log, severity::trace) << "Full configure command is " << configureCommand;
 
+                try {
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(executable),
+                                                                          boost::process::initializers::set_cmd_line(configureCommand),
+                                                                          boost::process::initializers::start_in_dir(m_binaryDir),
+                                                                          boost::process::initializers::inherit_env());
+                    auto exit_code = boost::process::wait_for_exit(child);
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Configure command " << configureCommand << " returned non-zero exit status!";
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to run configure comand " << configureCommand << ": " << ex.what();
+                    return false;
+                }
+
                 return true;
             }
 
