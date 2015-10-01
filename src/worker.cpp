@@ -226,6 +226,13 @@ namespace build_bot {
                     return false;
                 }
 
+                if (configureCommand.size() == 0) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Configure command is empty; continuing build!";
+                    return true;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Configure command is: " << configureCommand;
+
                 return true;
             }
 
