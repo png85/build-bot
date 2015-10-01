@@ -300,6 +300,7 @@ namespace build_bot {
                     return false;
                 }
 
+                BOOST_LOG_SEV(log, severity::info) << "Source configured successfully.";
                 return true;
             }
 
