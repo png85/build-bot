@@ -9,6 +9,8 @@
 
 #include <boost/process.hpp>
 
+#include <dsnutil/pretty_print.h>
+
 namespace fs = boost::filesystem;
 
 namespace dsn {
@@ -139,6 +141,7 @@ namespace build_bot {
                 BOOST_LOG_SEV(log, severity::info) << "Checked out revision " << m_revision;
 
                 m_macros.put<std::string>("CMAKE_SOURCE_DIRECTORY", m_sourceDirectory);
+
                 return true;
             }
 
@@ -260,6 +263,25 @@ namespace build_bot {
                 }
 
                 BOOST_LOG_SEV(log, severity::debug) << "Configure command after macro expansion is: " << configureCommand;
+                std::vector<std::string> command;
+                boost::algorithm::split(command, configureCommand, boost::is_any_of(" "));
+
+                BOOST_LOG_SEV(log, severity::trace) << "Split configure command is: " << command;
+                std::string executable = command[0];
+
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable is: " << executable;
+                try {
+                    executable = boost::process::search_path(executable);
+                }
+
+                catch (std::runtime_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to locate configure command in PATH";
+                    return false;
+                }
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable after path lookup is " << executable;
+
+                boost::algorithm::replace_first(configureCommand, command[0], executable);
+                BOOST_LOG_SEV(log, severity::trace) << "Full configure command is " << configureCommand;
 
                 return true;
             }
