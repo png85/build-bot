@@ -304,6 +304,35 @@ namespace build_bot {
                 return true;
             }
 
+            bool build()
+            {
+                BOOST_LOG_SEV(log, severity::info) << "Starting actual build for " << m_binaryDir;
+                std::string buildCommand;
+                try {
+                    buildCommand = m_buildSettings.get<std::string>(m_profileName + ".cmd_build");
+                }
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get build command from configuration: " << ex.what();
+                    return false;
+                }
+
+                if (buildCommand.size() == 0) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Build command is empty; skipping!";
+                    return true;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Build command is " << buildCommand;
+
+                if (!replaceMacros(buildCommand)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro expansion failed for build command!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Build command after macro expansion is " << buildCommand;
+
+                return true;
+            }
+
         public:
             Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
@@ -357,6 +386,11 @@ namespace build_bot {
 
                 if (!configureSources()) {
                     BOOST_LOG_SEV(log, severity::error) << "Configure step aborted; build FAILED!";
+                    return;
+                }
+
+                if (!build()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build step aborted; build FAILED!";
                     return;
                 }
             }
