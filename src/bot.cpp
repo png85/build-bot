@@ -131,6 +131,8 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_buildDirectory;
+
             bool initBuildDirectory()
             {
                 std::string buildDir;
@@ -153,6 +155,9 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::error) << "Configured build path " << buildDir << " isn't a directory!";
                     return false;
                 }
+
+                BOOST_LOG_SEV(log, severity::info) << "Build directory is " << buildDir;
+                m_buildDirectory = buildDir;
 
                 return true;
             }
