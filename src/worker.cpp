@@ -10,9 +10,11 @@ namespace build_bot {
             std::string m_configFile;
             std::string m_profileName;
             std::string m_buildDir;
+            std::string m_repoName;
 
         public:
             Worker(const std::string& build_directory,
+                   const std::string& repo_name,
                    const std::string& url, const std::string& branch, const std::string& revision,
                    const std::string& config_file, const std::string& profile_name)
                 : m_buildDir(build_directory)
@@ -21,6 +23,7 @@ namespace build_bot {
                 , m_revision(revision)
                 , m_configFile(config_file)
                 , m_profileName(profile_name)
+                , m_repoName(repo_name)
             {
             }
 
@@ -37,9 +40,10 @@ namespace build_bot {
 using namespace dsn::build_bot;
 
 Worker::Worker(const std::string& build_directory,
+               const std::string& repo_name,
                const std::string& url, const std::string& branch, const std::string& revision,
                const std::string& config_file, const std::string& profile_name)
-    : m_impl(new priv::Worker(build_directory, url, branch, revision, config_file, profile_name))
+    : m_impl(new priv::Worker(build_directory, repo_name, url, branch, revision, config_file, profile_name))
 {
 }
 
