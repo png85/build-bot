@@ -131,6 +131,32 @@ namespace build_bot {
                 return true;
             }
 
+            bool initBuildDirectory()
+            {
+                std::string buildDir;
+                try {
+                    buildDir = m_settings.get("fs.build_dir");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get build directory from configuration: " << ex.what();
+                    return false;
+                }
+
+                fs::path path(buildDir);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build directory " << buildDir << "doesn't exist!";
+                    return false;
+                }
+
+                if (!fs::is_directory(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Configured build path " << buildDir << " isn't a directory!";
+                    return false;
+                }
+
+                return true;
+            }
+
             boost::asio::io_service m_io;
             boost::asio::strand m_strand;
 
@@ -238,6 +264,9 @@ namespace build_bot {
                     return false;
 
                 if (!initRepositories())
+                    return false;
+
+                if (!initBuildDirectory())
                     return false;
 
                 if (!initFifo())
