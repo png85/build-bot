@@ -9,6 +9,7 @@
 
 #include <boost/process.hpp>
 
+#include <dsnutil/finally.h>
 #include <dsnutil/pretty_print.h>
 
 namespace fs = boost::filesystem;
@@ -300,6 +301,75 @@ namespace build_bot {
                     return false;
                 }
 
+                BOOST_LOG_SEV(log, severity::info) << "Source configured successfully.";
+                return true;
+            }
+
+            bool build()
+            {
+                BOOST_LOG_SEV(log, severity::info) << "Starting actual build for " << m_binaryDir;
+                std::string buildCommand;
+                try {
+                    buildCommand = m_buildSettings.get<std::string>(m_profileName + ".cmd_build");
+                }
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get build command from configuration: " << ex.what();
+                    return false;
+                }
+
+                if (buildCommand.size() == 0) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Build command is empty; skipping!";
+                    return true;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Build command is " << buildCommand;
+
+                if (!replaceMacros(buildCommand)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro expansion failed for build command!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Build command after macro expansion is " << buildCommand;
+                std::vector<std::string> command;
+                boost::algorithm::split(command, buildCommand, boost::is_any_of(" "));
+
+                BOOST_LOG_SEV(log, severity::trace) << "Split build command is: " << command;
+                std::string executable = command[0];
+
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable is: " << executable;
+                try {
+                    executable = boost::process::search_path(executable);
+                }
+
+                catch (std::runtime_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to locate build command in PATH!";
+                    return false;
+                }
+                BOOST_LOG_SEV(log, severity::trace) << "Build executable after path lookup is " << executable;
+
+                boost::algorithm::replace_first(buildCommand, command[0], executable);
+
+                BOOST_LOG_SEV(log, severity::trace) << "Full build command is " << buildCommand;
+
+                try {
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(executable),
+                                                                          boost::process::initializers::set_cmd_line(buildCommand),
+                                                                          boost::process::initializers::start_in_dir(m_binaryDir),
+                                                                          boost::process::initializers::inherit_env());
+                    auto exit_code = boost::process::wait_for_exit(child);
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Build command " << buildCommand << " returned non-zero exit status!";
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to execute build command " << buildCommand << ": " << ex.what();
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Build stage completed successfully.";
+
                 return true;
             }
 
@@ -334,6 +404,17 @@ namespace build_bot {
                     return;
                 }
 
+                dsn::finally finally_delete_toplevel_dir([&]() {
+		    BOOST_LOG_SEV(log , severity::info) << "Removing build directory: " << m_toplevelDirectory;
+		    try {
+		      fs::path path(m_toplevelDirectory);
+		      fs::remove_all(path);
+		    }
+		    catch(boost::system::system_error& ex) {
+		      BOOST_LOG_SEV(log,severity::error) << "Failed to remove build directory: " << ex.what();
+		    }
+                });
+
                 if (!loadMacroFile()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to load macro file; build FAILED!";
                     return;
@@ -358,6 +439,13 @@ namespace build_bot {
                     BOOST_LOG_SEV(log, severity::error) << "Configure step aborted; build FAILED!";
                     return;
                 }
+
+                if (!build()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build step aborted; build FAILED!";
+                    return;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "All steps finished; build SUCCESSFUL!";
             }
         };
 

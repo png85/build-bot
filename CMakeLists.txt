@@ -5,7 +5,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake-modules")
 
 set(buildbot_VERSION_MAJOR 0)
 set(buildbot_VERSION_MINOR 99)
-set(buildbot_VERSION_PATCH 2)
+set(buildbot_VERSION_PATCH 3)
 
 find_package(Threads REQUIRED)
 
@@ -45,3 +45,5 @@ set(CPACK_PACKAGE_VERSION_MAJOR ${buildbot_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${buildbot_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${buildbot_VERSION_PATCH})
 include(CPack)
+
+include(CTest)
