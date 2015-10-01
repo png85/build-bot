@@ -140,6 +140,32 @@ namespace build_bot {
                 return true;
             }
 
+            boost::property_tree::ptree m_macros;
+            bool loadMacroFile()
+            {
+                fs::path path(m_macroFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Macro file " << m_macroFile << " doesn't exist!";
+                    return true;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro configuration " << m_macroFile << " exists but isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(m_macroFile, m_macros);
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse macros from " << m_macroFile << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
             boost::property_tree::ptree m_buildSettings;
             bool loadBuildConfig()
             {
@@ -195,6 +221,11 @@ namespace build_bot {
                                                    << " (profile: " << m_profileName << ", config: " << m_configFile << ") - Build ID: " << m_buildId;
                 if (!initToplevelDirectory()) {
                     BOOST_LOG_SEV(log, severity::error) << "Unable to create build directory; build FAILED!";
+                    return;
+                }
+
+                if (!loadMacroFile()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to load macro file; build FAILED!";
                     return;
                 }
 
