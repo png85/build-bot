@@ -15,6 +15,7 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
 
+#include <dsnutil/log/sinkmanager.h>
 #include <dsnutil/log/util.h>
 #include <dsnutil/threadpool.h>
 
@@ -279,6 +280,17 @@ namespace build_bot {
 
                 m_logSeverity = dsn::log::util::severityFromString(logLevel);
                 BOOST_LOG_SEV(log, severity::debug) << "Configured log severity is " << m_logSeverity;
+
+                dsn::log::SinkManager& manager = dsn::log::SinkManager::instanceRef();
+                for (auto& name : manager.sinks()) {
+                    auto sink = reinterpret_cast<boost::log::sinks::basic_sink_frontend*>(manager.sink(name).get());
+                    assert(sink != nullptr);
+                    sink->set_filter([&](const boost::log::attribute_value_set& attrs) -> bool {
+			return attrs["Severity"].extract<severity>() >= m_logSeverity;
+                    });
+                    BOOST_LOG_SEV(log, severity::debug) << "Installed priority filter for sink " << name;
+                }
+
                 return true;
             }
 
