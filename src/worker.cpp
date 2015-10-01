@@ -1,6 +1,8 @@
 #include <build-bot/worker.h>
 
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 
@@ -137,6 +139,33 @@ namespace build_bot {
                 return true;
             }
 
+            boost::property_tree::ptree m_buildSettings;
+            bool loadBuildConfig()
+            {
+                std::string configFile = m_sourceDirectory + "/" + m_configFile;
+                fs::path path(configFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build config file " << m_configFile << " doesn't exist in " << m_sourceDirectory;
+                    return false;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build config file " << configFile << " exists but isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(configFile, m_buildSettings);
+                }
+
+                catch (boost::property_tree::ini_parser_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse build configuration in " << m_configFile << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
         public:
             Worker(const std::string& build_directory,
                    const std::string& repo_name,
@@ -169,6 +198,11 @@ namespace build_bot {
 
                 if (!checkoutSources()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to checkout sources from " << m_url << "; build FAILED!";
+                    return;
+                }
+
+                if (!loadBuildConfig()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to load build configuration; build FAILED!";
                     return;
                 }
             }
