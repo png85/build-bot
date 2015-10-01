@@ -138,6 +138,7 @@ namespace build_bot {
 
                 BOOST_LOG_SEV(log, severity::info) << "Checked out revision " << m_revision;
 
+                m_macros.put<std::string>("CMAKE_SOURCE_DIRECTORY", m_sourceDirectory);
                 return true;
             }
 
