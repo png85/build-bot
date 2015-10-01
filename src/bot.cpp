@@ -1,4 +1,5 @@
 #include <build-bot/bot.h>
+#include <build-bot/worker.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -14,6 +15,8 @@
 #include <boost/property_tree/ini_parser.hpp>
 #include <boost/regex.hpp>
 
+#include <dsnutil/threadpool.h>
+
 namespace fs = boost::filesystem;
 using namespace dsn::build_bot;
 
@@ -23,6 +26,7 @@ namespace build_bot {
         class Bot : public dsn::log::Base<Bot> {
         protected:
             boost::property_tree::ptree m_settings;
+            boost::property_tree::ptree m_repositories;
 
             bool loadConfig(const std::string& config_file)
             {
@@ -91,6 +95,80 @@ namespace build_bot {
                 return true;
             }
 
+            bool initRepositories()
+            {
+                std::string repoFile;
+                try {
+                    repoFile = m_settings.get<std::string>("repositories.config", DEFAULT_REPO_CONFIG);
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get repository config file from settings: " << ex.what();
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Initializing repository configuration from " << repoFile;
+                fs::path path(repoFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Repository config file " << repoFile << " doesn't exist!";
+                    return false;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Repository config " << repoFile << " isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(repoFile, m_repositories);
+                }
+
+                catch (boost::property_tree::ini_parser_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse repository configuration from " << repoFile << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
+            std::string m_buildDirectory;
+
+            bool initBuildDirectory()
+            {
+                std::string buildDir;
+                try {
+                    buildDir = m_settings.get<std::string>("fs.build_dir");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Unable to get build directory from configuration: " << ex.what();
+                    return false;
+                }
+
+                fs::path path(buildDir);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Build directory " << buildDir << "doesn't exist; trying to create it!";
+                    try {
+                        boost::filesystem::create_directories(path);
+                    }
+
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create build directory " << buildDir << ": " << ex.what();
+                        return false;
+                    }
+                }
+
+                if (!fs::is_directory(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Configured build path " << buildDir << " isn't a directory!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::info) << "Build directory is " << buildDir;
+                m_buildDirectory = buildDir;
+
+                return true;
+            }
+
             boost::asio::io_service m_io;
             boost::asio::strand m_strand;
 
@@ -136,14 +214,41 @@ namespace build_bot {
                 }
 
                 try {
-                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+)$");
+                    boost::regex BUILD_regex("^BUILD (.+) (.+) (.+) (.+)$");
                     boost::cmatch match;
                     if (boost::regex_match(message.c_str(), match, BUILD_regex)) {
                         std::string repoName(match[1].first, match[1].second);
                         std::string profileName(match[2].first, match[2].second);
-                        std::string gitRevision(match[3].first, match[3].second);
+                        std::string branchName(match[3].first, match[3].second);
+                        std::string gitRevision(match[4].first, match[4].second);
 
                         BOOST_LOG_SEV(log, severity::info) << "Got BUILD request for repo=" << repoName << ", profile=" << profileName << ", SHA1: " << gitRevision;
+                        std::string repoUrl;
+                        std::string repoConfigFile;
+                        try {
+                            repoUrl = m_repositories.get<std::string>(repoName + ".url");
+                            repoConfigFile = m_repositories.get<std::string>(repoName + ".config");
+                        }
+                        catch (boost::property_tree::ptree_error& ex) {
+                            BOOST_LOG_SEV(log, severity::error) << "Unable to get configuration for repository " << repoName << ": " << ex.what();
+                            return true;
+                        }
+
+                        std::string macroFile;
+                        try {
+                            macroFile = m_settings.get<std::string>("fs.macro_file", DEFAULT_MACRO_FILE);
+                        }
+
+                        catch (boost::property_tree::ptree_error& ex) {
+                            BOOST_LOG_SEV(log, severity::error) << "Failed to get macro file name from settings: " << ex.what();
+                            return false;
+                        }
+
+                        m_threadPool.enqueue([=]() {
+			    dsn::build_bot::Worker worker(macroFile, m_buildDirectory, repoName, repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+			    worker.run();
+                        });
+
                         return true;
                     }
                 }
@@ -155,6 +260,8 @@ namespace build_bot {
 
                 return false;
             }
+
+            dsn::ThreadPool m_threadPool;
 
         public:
             Bot()
@@ -176,6 +283,12 @@ namespace build_bot {
             bool init(const std::string& config_file)
             {
                 if (!loadConfig(config_file))
+                    return false;
+
+                if (!initRepositories())
+                    return false;
+
+                if (!initBuildDirectory())
                     return false;
 
                 if (!initFifo())
@@ -214,12 +327,17 @@ namespace build_bot {
 
                 return dsn::build_bot::Bot::ExitCode::Success;
             }
+
+            static const std::string DEFAULT_REPO_CONFIG;
+            static const std::string DEFAULT_MACRO_FILE;
         };
     }
 }
 }
 
 const std::string dsn::build_bot::Bot::DEFAULT_CONFIG_FILE{ "etc/build-bot/bot.conf" };
+const std::string dsn::build_bot::priv::Bot::DEFAULT_REPO_CONFIG{ "etc/build-bot/repos.conf" };
+const std::string dsn::build_bot::priv::Bot::DEFAULT_MACRO_FILE{ "etc/build-bot/macros.conf" };
 
 Bot::Bot()
     : m_impl(new priv::Bot())
