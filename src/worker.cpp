@@ -22,6 +22,7 @@ namespace build_bot {
             std::string m_profileName;
             std::string m_buildDir;
             std::string m_repoName;
+            std::string m_macroFile;
 
             std::string generateBuildId()
             {
@@ -167,11 +168,12 @@ namespace build_bot {
             }
 
         public:
-            Worker(const std::string& build_directory,
+            Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
                    const std::string& url, const std::string& branch, const std::string& revision,
                    const std::string& config_file, const std::string& profile_name)
                 : m_buildDir(build_directory)
+                , m_macroFile(macro_file)
                 , m_url(url)
                 , m_branch(branch)
                 , m_revision(revision)
@@ -216,11 +218,11 @@ namespace build_bot {
 
 using namespace dsn::build_bot;
 
-Worker::Worker(const std::string& build_directory,
+Worker::Worker(const std::string& macro_file, const std::string& build_directory,
                const std::string& repo_name,
                const std::string& url, const std::string& branch, const std::string& revision,
                const std::string& config_file, const std::string& profile_name)
-    : m_impl(new priv::Worker(build_directory, repo_name, url, branch, revision, config_file, profile_name))
+    : m_impl(new priv::Worker(macro_file, build_directory, repo_name, url, branch, revision, config_file, profile_name))
 {
 }
 
