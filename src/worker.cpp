@@ -329,6 +329,26 @@ namespace build_bot {
                 }
 
                 BOOST_LOG_SEV(log, severity::debug) << "Build command after macro expansion is " << buildCommand;
+                std::vector<std::string> command;
+                boost::algorithm::split(command, buildCommand, boost::is_any_of(" "));
+
+                BOOST_LOG_SEV(log, severity::trace) << "Split build command is: " << command;
+                std::string executable = command[0];
+
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable is: " << executable;
+                try {
+                    executable = boost::process::search_path(executable);
+                }
+
+                catch (std::runtime_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to locate build command in PATH!";
+                    return false;
+                }
+                BOOST_LOG_SEV(log, severity::trace) << "Build executable after path lookup is " << executable;
+
+                boost::algorithm::replace_first(buildCommand, command[0], executable);
+
+                BOOST_LOG_SEV(log, severity::trace) << "Full build command is " << buildCommand;
 
                 return true;
             }
