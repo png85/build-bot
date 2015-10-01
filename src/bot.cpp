@@ -135,7 +135,7 @@ namespace build_bot {
             {
                 std::string buildDir;
                 try {
-                    buildDir = m_settings.get("fs.build_dir");
+                    buildDir = m_settings.get<std::string>("fs.build_dir");
                 }
 
                 catch (boost::property_tree::ptree_error& ex) {
