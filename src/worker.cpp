@@ -89,6 +89,27 @@ namespace build_bot {
                 m_sourceDirectory = m_toplevelDirectory + "/repo";
                 BOOST_LOG_SEV(log, severity::info) << "Checking out sources from " << m_url << " to " << m_sourceDirectory;
 
+                try {
+                    std::stringstream ssArgs;
+                    ssArgs << m_gitExecutable << " clone -q --recursive -b " << m_branch << " " << m_url << " " << m_sourceDirectory;
+                    std::string args = ssArgs.str();
+                    BOOST_LOG_SEV(log, severity::debug) << "Git command line is " << args;
+
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(m_gitExecutable),
+                                                                          boost::process::initializers::set_cmd_line(args));
+                    auto exit_code = boost::process::wait_for_exit(child);
+
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Got non-zero exit status from '" << args << "': " << exit_code;
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to run git to check out sources: " << ex.what();
+                    return false;
+                }
+
                 return true;
             }
 
