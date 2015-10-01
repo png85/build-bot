@@ -1,5 +1,6 @@
 #include <build-bot/worker.h>
 
+#include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
@@ -7,6 +8,8 @@
 #include <boost/random/uniform_int_distribution.hpp>
 
 #include <boost/process.hpp>
+
+#include <dsnutil/pretty_print.h>
 
 namespace fs = boost::filesystem;
 
@@ -135,7 +138,9 @@ namespace build_bot {
                     return false;
                 }
 
-                BOOST_LOG_SEV(log, severity::info) << "Checkout out revision " << m_revision;
+                BOOST_LOG_SEV(log, severity::info) << "Checked out revision " << m_revision;
+
+                m_macros.put<std::string>("CMAKE_SOURCE_DIRECTORY", m_sourceDirectory);
 
                 return true;
             }
@@ -193,6 +198,111 @@ namespace build_bot {
                 return true;
             }
 
+            std::string m_binaryDir;
+            bool createBinaryDir()
+            {
+                m_binaryDir = m_toplevelDirectory + "/build";
+                fs::path path(m_binaryDir);
+
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::info) << "Creating binary dir: " << m_binaryDir;
+                    try {
+                        fs::create_directories(path);
+                    }
+                    catch (boost::system::system_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to create binary dir " << m_binaryDir << ": " << ex.what();
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            bool replaceMacros(std::string& str)
+            {
+                for (auto& kv : m_macros) {
+                    try {
+                        std::string key = kv.first;
+                        std::string val = m_macros.get<std::string>(key);
+                        std::string token = "@" + key + "@";
+                        boost::algorithm::replace_all(str, token, val);
+                    }
+
+                    catch (boost::property_tree::ptree_error& ex) {
+                        BOOST_LOG_SEV(log, severity::error) << "Failed to replace macro: " << ex.what();
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            bool configureSources()
+            {
+                BOOST_LOG_SEV(log, severity::info) << "Trying to configure sources";
+                std::string configureCommand;
+                try {
+                    configureCommand = m_buildSettings.get<std::string>(m_profileName + ".cmd_configure");
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to get configure command from build settings: " << ex.what();
+                    return false;
+                }
+
+                if (configureCommand.size() == 0) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Configure command is empty; continuing build!";
+                    return true;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Configure command is: " << configureCommand;
+
+                if (!replaceMacros(configureCommand)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro expansion failed for configure command!";
+                    return false;
+                }
+
+                BOOST_LOG_SEV(log, severity::debug) << "Configure command after macro expansion is: " << configureCommand;
+                std::vector<std::string> command;
+                boost::algorithm::split(command, configureCommand, boost::is_any_of(" "));
+
+                BOOST_LOG_SEV(log, severity::trace) << "Split configure command is: " << command;
+                std::string executable = command[0];
+
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable is: " << executable;
+                try {
+                    executable = boost::process::search_path(executable);
+                }
+
+                catch (std::runtime_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to locate configure command in PATH";
+                    return false;
+                }
+                BOOST_LOG_SEV(log, severity::trace) << "Configure executable after path lookup is " << executable;
+
+                boost::algorithm::replace_first(configureCommand, command[0], executable);
+                BOOST_LOG_SEV(log, severity::trace) << "Full configure command is " << configureCommand;
+
+                try {
+                    boost::process::child child = boost::process::execute(boost::process::initializers::run_exe(executable),
+                                                                          boost::process::initializers::set_cmd_line(configureCommand),
+                                                                          boost::process::initializers::start_in_dir(m_binaryDir),
+                                                                          boost::process::initializers::inherit_env());
+                    auto exit_code = boost::process::wait_for_exit(child);
+                    if (exit_code != 0) {
+                        BOOST_LOG_SEV(log, severity::error) << "Configure command " << configureCommand << " returned non-zero exit status!";
+                        return false;
+                    }
+                }
+
+                catch (boost::system::system_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to run configure comand " << configureCommand << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
         public:
             Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
@@ -234,8 +344,18 @@ namespace build_bot {
                     return;
                 }
 
+                if (!createBinaryDir()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to create build directory; build FAILED!";
+                    return;
+                }
+
                 if (!loadBuildConfig()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to load build configuration; build FAILED!";
+                    return;
+                }
+
+                if (!configureSources()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Configure step aborted; build FAILED!";
                     return;
                 }
             }
