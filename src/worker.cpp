@@ -1,6 +1,8 @@
 #include <build-bot/worker.h>
 
 #include <boost/filesystem.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/ini_parser.hpp>
 #include <boost/random/random_device.hpp>
 #include <boost/random/uniform_int_distribution.hpp>
 
@@ -20,6 +22,7 @@ namespace build_bot {
             std::string m_profileName;
             std::string m_buildDir;
             std::string m_repoName;
+            std::string m_macroFile;
 
             std::string generateBuildId()
             {
@@ -137,12 +140,66 @@ namespace build_bot {
                 return true;
             }
 
+            boost::property_tree::ptree m_macros;
+            bool loadMacroFile()
+            {
+                fs::path path(m_macroFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::warning) << "Macro file " << m_macroFile << " doesn't exist!";
+                    return true;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Macro configuration " << m_macroFile << " exists but isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(m_macroFile, m_macros);
+                }
+
+                catch (boost::property_tree::ptree_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse macros from " << m_macroFile << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
+            boost::property_tree::ptree m_buildSettings;
+            bool loadBuildConfig()
+            {
+                std::string configFile = m_sourceDirectory + "/" + m_configFile;
+                fs::path path(configFile);
+                if (!fs::exists(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build config file " << m_configFile << " doesn't exist in " << m_sourceDirectory;
+                    return false;
+                }
+
+                if (!fs::is_regular_file(path)) {
+                    BOOST_LOG_SEV(log, severity::error) << "Build config file " << configFile << " exists but isn't a regular file!";
+                    return false;
+                }
+
+                try {
+                    boost::property_tree::read_ini(configFile, m_buildSettings);
+                }
+
+                catch (boost::property_tree::ini_parser_error& ex) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to parse build configuration in " << m_configFile << ": " << ex.what();
+                    return false;
+                }
+
+                return true;
+            }
+
         public:
-            Worker(const std::string& build_directory,
+            Worker(const std::string& macro_file, const std::string& build_directory,
                    const std::string& repo_name,
                    const std::string& url, const std::string& branch, const std::string& revision,
                    const std::string& config_file, const std::string& profile_name)
                 : m_buildDir(build_directory)
+                , m_macroFile(macro_file)
                 , m_url(url)
                 , m_branch(branch)
                 , m_revision(revision)
@@ -167,8 +224,18 @@ namespace build_bot {
                     return;
                 }
 
+                if (!loadMacroFile()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to load macro file; build FAILED!";
+                    return;
+                }
+
                 if (!checkoutSources()) {
                     BOOST_LOG_SEV(log, severity::error) << "Failed to checkout sources from " << m_url << "; build FAILED!";
+                    return;
+                }
+
+                if (!loadBuildConfig()) {
+                    BOOST_LOG_SEV(log, severity::error) << "Failed to load build configuration; build FAILED!";
                     return;
                 }
             }
@@ -182,11 +249,11 @@ namespace build_bot {
 
 using namespace dsn::build_bot;
 
-Worker::Worker(const std::string& build_directory,
+Worker::Worker(const std::string& macro_file, const std::string& build_directory,
                const std::string& repo_name,
                const std::string& url, const std::string& branch, const std::string& revision,
                const std::string& config_file, const std::string& profile_name)
-    : m_impl(new priv::Worker(build_directory, repo_name, url, branch, revision, config_file, profile_name))
+    : m_impl(new priv::Worker(macro_file, build_directory, repo_name, url, branch, revision, config_file, profile_name))
 {
 }
 

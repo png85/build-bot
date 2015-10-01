@@ -234,8 +234,18 @@ namespace build_bot {
                             return true;
                         }
 
+                        std::string macroFile;
+                        try {
+                            macroFile = m_settings.get<std::string>("fs.macro_file", DEFAULT_MACRO_FILE);
+                        }
+
+                        catch (boost::property_tree::ptree_error& ex) {
+                            BOOST_LOG_SEV(log, severity::error) << "Failed to get macro file name from settings: " << ex.what();
+                            return false;
+                        }
+
                         m_threadPool.enqueue([=]() {
-			    dsn::build_bot::Worker worker(m_buildDirectory, repoName, repoUrl, branchName, gitRevision, repoConfigFile, profileName);
+			    dsn::build_bot::Worker worker(macroFile, m_buildDirectory, repoName, repoUrl, branchName, gitRevision, repoConfigFile, profileName);
 			    worker.run();
                         });
 
@@ -319,6 +329,7 @@ namespace build_bot {
             }
 
             static const std::string DEFAULT_REPO_CONFIG;
+            static const std::string DEFAULT_MACRO_FILE;
         };
     }
 }
@@ -326,6 +337,7 @@ namespace build_bot {
 
 const std::string dsn::build_bot::Bot::DEFAULT_CONFIG_FILE{ "etc/build-bot/bot.conf" };
 const std::string dsn::build_bot::priv::Bot::DEFAULT_REPO_CONFIG{ "etc/build-bot/repos.conf" };
+const std::string dsn::build_bot::priv::Bot::DEFAULT_MACRO_FILE{ "etc/build-bot/macros.conf" };
 
 Bot::Bot()
     : m_impl(new priv::Bot())
